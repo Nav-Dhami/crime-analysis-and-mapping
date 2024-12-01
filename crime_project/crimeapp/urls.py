@@ -2,5 +2,5 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('', views.home, name = 'home'), #This is to map the root URL to the home view.
+    path('', views.home, name = 'home'), 
 ]

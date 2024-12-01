@@ -1,5 +1,5 @@
 import os
-import pandas as pd
+import pandas as panda
 
 # Path to the directory with subfolders for each month's data.
 data_directory = "data/west-midlands-sept-12-month-data"
@@ -26,7 +26,7 @@ for month_folder in os.listdir(data_directory):
 
             try:
                 if file_type == "crime":
-                    crime_data_df = pd.read_csv(file_path)
+                    crime_data_df = panda.read_csv(file_path)
                     # Remove unnecessary columns.
                     crime_data_df = crime_data_df.drop(
                         columns=["Reported by", "Location"]
@@ -35,13 +35,13 @@ for month_folder in os.listdir(data_directory):
                     print(f"Loaded and cleaned crime data: {file_path}")
 
                 elif file_type == "outcomes":
-                    pd.read_csv(
+                    panda.read_csv(
                         file_path
                     )  # Outcomes data does not need cleaning.
                     print(f"Loaded outcomes data: {file_path}")
 
                 elif file_type == "stop_and_search":
-                    pd.read_csv(
+                    panda.read_csv(
                         file_path
                     )  # Stop and search data does not need cleaning.
                     print(f"Loaded stop and search data: {file_path}")
@@ -51,7 +51,7 @@ for month_folder in os.listdir(data_directory):
 
 # Combine the cleaned crime data if any exists.
 if monthly_crime_data:
-    combined_crime_data_df = pd.concat(monthly_crime_data, ignore_index=True)
+    combined_crime_data_df = panda.concat(monthly_crime_data, ignore_index=True)
     print(f"Combined Crime DataFrame shape: {combined_crime_data_df.shape}")
 
     # Save the combined data for future analysis.

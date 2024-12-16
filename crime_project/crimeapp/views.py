@@ -4,3 +4,7 @@ from django.http import HttpResponse
 
 def home(request):
     return HttpResponse("Welcome to the Crime Analysis Map!")
+
+def crimemap_view(request):
+    return render(request, 'crimemap.html')
+

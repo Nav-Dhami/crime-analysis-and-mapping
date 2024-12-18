@@ -4,17 +4,13 @@
 <html>
 <head>
     <title>Interactive Crime Map</title>
-    
     <link rel="stylesheet" href="{% static 'css/leaflet.css' %}" />
     <style>
-        
         html, body {
             margin: 0;
             padding: 0;
             height: 100%;
         }
-
-        
         #map {
             width: 100%;
             height: 100%;
@@ -25,28 +21,58 @@
     <div id="map"></div>
 
     <script src="{% static 'js/leaflet.js' %}"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> 
 
     <script>
-        // cordinates for Birmingham city center
+        // Cordinates for Birmingham City Center
         var lat = 52.4862;
         var lon = -1.8904;
 
-        var southWest = L.latLng(52.3780, -1.9950);  // southwest corner of Birmingham
-        var northEast = L.latLng(52.5430, -1.7540);  // northeast corner of Birmingham
+        
+        var southWest = L.latLng(52.3975, -1.987);  // Southwest corner of Birmingham
+        var northEast = L.latLng(52.5575, -1.730);  // Northeast corner of Birmingham
         var bounds = L.latLngBounds(southWest, northEast);
 
         
         var map = L.map('map', {
             center: [lat, lon],
-            zoom: 13,  
-            maxBounds: bounds,  // restrict map bounds to Birmingham
-            maxBoundsViscosity: 1.0  // ensures the map stays within bounds
+            zoom: 16,
+            maxBounds: bounds,  
+            maxBoundsViscosity: 1.0  
         });
 
-        
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
 
-    
+        
+        $.getJSON('{% static "crime_with_clusters_brum.json" %}', function(data) {
+
+            // Loop through the crime data and add markers - to make them interactable later
+            data.forEach(function(crime) {
+                var lat = crime.Latitude;
+                var lon = crime.Longitude;
+                var cluster = crime.Cluster;
+
+                
+                var color;
+                if (cluster === 0) {
+                    color = 'red'; 
+                } else if (cluster === 1) {
+                    color = 'blue'; 
+                } else {
+                    color = 'green'; 
+                }
+
+                
+                L.circleMarker([lat, lon], {
+                    radius: 8,           
+                    color: color,        
+                    fillColor: color,    
+                    fillOpacity: 0.8     
+                }).addTo(map);
+            });
+        });
     </script>
 </body>
 </html>

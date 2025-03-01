@@ -1,0 +1,202 @@
+/* General Styles */
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    font-family: Arial, sans-serif;
+    overflow: hidden; 
+}
+
+#map {
+    width: 100%;
+    height: 100%;
+}
+
+/* Sidebar Styles */
+#sidebar {
+    position: fixed;
+    left: -250px; 
+    top: 0;
+    width: 250px;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    transition: left 0.3s ease-in-out;
+    z-index: 1000;
+    border-radius: 0 15px 15px 0;
+    border-left: 1px solid rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    overflow-y: hidden;
+}
+
+#sidebarToggle {
+    position: fixed;
+    left: 10px;
+    top: 10px;
+    background: rgba(255, 255, 255, 0.95);
+    border: none;
+    padding: 10px 15px;
+    cursor: pointer;
+    font-size: 16px;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    z-index: 1001;
+    transition: all 0.3s ease-in-out;
+}
+
+#sidebarToggle:hover {
+    background: rgba(240, 240, 240, 0.95);
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+}
+
+#sidebar.open {
+    left: 0;
+}
+
+#sidebarContent {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#sidebarContent h3 {
+    margin-top: 0;
+    color: #333;
+}
+
+#sidebarContent label {
+    display: block;
+    margin-top: 10px;
+    color: #555;
+}
+
+#sidebarContent select, #sidebarContent input {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+    border-radius: 5px;
+    border: 1px solid #ddd;
+    background: rgba(255, 255, 255, 0.9);
+    transition: border-color 0.3s ease-in-out;
+}
+
+#sidebarContent select:focus, #sidebarContent input:focus {
+    border-color: #007bff;
+    outline: none;
+}
+
+#applyFilters {
+    width: 100%;
+    padding: 10px;
+    margin-top: 20px;
+    background: #007bff;
+    color: white;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: background 0.3s ease-in-out;
+}
+
+#applyFilters:hover {
+    background: #0056b3;
+}
+
+#crimeTypeFilters {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: hidden;
+}
+
+.crimeTypeFilterItem {
+    padding: 10px;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: background 0.3s ease;
+}
+
+.crimeTypeFilterItem:hover {
+    background: rgba(0, 123, 255, 0.1);
+}
+
+.crimeTypeFilterItem.selected {
+    background: rgba(0, 123, 255, 0.2);
+    text-decoration: line-through;
+    color: #888;
+}
+
+/* Dark Mode Styles */
+body.dark-mode #sidebar {
+    background: rgba(40, 40, 40, 0.95);
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    color: #ddd;
+}
+
+body.dark-mode #sidebarContent h3,
+body.dark-mode #sidebarContent label,
+body.dark-mode #sidebarContent .crimeTypeFilterItem {
+    color: #ddd !important;
+}
+
+body.dark-mode #sidebarContent .crimeTypeFilterItem.selected {
+    color: #888 !important;
+}
+
+body.dark-mode #sidebarContent select,
+body.dark-mode #sidebarContent input {
+    background: rgba(60, 60, 60, 0.9);
+    border-color: #444;
+    color: #ddd;
+}
+
+body.dark-mode #sidebarContent select:focus,
+body.dark-mode #sidebarContent input:focus {
+    border-color: #007bff;
+}
+
+body.dark-mode #sidebarToggle {
+    background: rgba(40, 40, 40, 0.95);
+    color: #ddd;
+}
+
+body.dark-mode #sidebarToggle:hover {
+    background: rgba(60, 60, 60, 0.95);
+}
+
+body.dark-mode #applyFilters {
+    background: #0056b3;
+}
+
+body.dark-mode #applyFilters:hover {
+    background: #004080;
+}
+
+#darkModeToggle {
+    background-color: white;
+    color: black;
+    border: 1px solid black;
+    padding: 10px;
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    cursor: pointer;
+    z-index: 1003;
+}
+
+.dark-mode #darkModeToggle {
+    background-color: black;
+    color: white;
+    border: 1px solid white;
+}
+
+
+#darkModeToggle:hover {
+    background: #555;
+}
+
+
+

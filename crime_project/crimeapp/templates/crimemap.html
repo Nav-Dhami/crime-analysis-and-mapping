@@ -5,73 +5,310 @@
 <head>
     <title>Interactive Crime Map</title>
     <link rel="stylesheet" href="{% static 'css/leaflet.css' %}" />
-    <style>
-        html, body {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-        }
-        #map {
-            width: 100%;
-            height: 100%;
-        }
-    </style>
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}" />
+    <!-- Leaflet Marker Clustering CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
 </head>
 <body>
+    <!-- Loading Spinner (hardly works due to load times not being long enough, although... keep for now as dataset will get bigger and db transition to MySQL)--> 
+    <div id="loadingSpinner" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1002;">
+        <div style="border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;"></div>
+    </div>
+
+    <!-- Legend -->
+    <div id="legend" style="position: fixed; top: 60px; right: 10px; background: rgba(255, 255, 255, 0.9); padding: 10px; border-radius: 5px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); z-index: 1002;">
+        <h4>Crime Types</h4>
+        <div id="legendItems"></div>
+    </div>
+
+    <!-- Dark Mode Toggle Button -->
+    <button id="darkModeToggle">🌙 Dark Mode</button>
+
+    <!-- Side Navigation Bar -->
+    <div id="sidebar">
+        <button id="sidebarToggle">☰ Filters</button>
+        <div id="sidebarContent">
+            <h3>Filters</h3>
+          
+            <div>
+                <label for="crimeTypeDropdown">Quick Filter:</label>
+                <select id="crimeTypeDropdown">
+                    <option value="All">All</option>
+                 
+                </select>
+            </div>
+           
+            <div id="crimeTypeFilters">
+               
+            </div>
+            <div>
+                <label for="timeFilter">Time:</label>
+                <input type="month" id="timeFilter">
+            </div>
+            <button id="applyFilters">Apply Filters</button>
+        </div>
+    </div>
+
+    <!-- Map Container -->
     <div id="map"></div>
 
+    <!-- Leaflet, jQuery, and Marker Clustering -->
     <script src="{% static 'js/leaflet.js' %}"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> 
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
 
     <script>
-        // Cordinates for Birmingham City Center
+        
+        const crimeTypeColors = {
+        "Anti-social behaviour": "#FF5733", // Strong Orange
+        "Bicycle theft": "#009688", // Teal
+        "Burglary": "#FFD700", // Yellow
+        "Criminal damage and arson": "#D50000", // Deep Red
+        "Drugs": "#8E24AA", // Dark Purple
+        "Other crime": "#00838F", // Deep Cyan
+        "Other theft": "#FF9800", // Bright Orange
+        "Possession of weapons": "#F44336", // Strong Red
+        "Public order": "#4CAF50", // Dark Green
+        "Robbery": "#1A237E", // Dark Blue
+        "Shoplifting": "#E65100", // Dark Orange
+        "Theft from the person": "#76FF03", // Neon Green
+        "Vehicle crime": "#FF69B4", // Pink
+        "Violence and sexual offences": "#C2185B" // Strong Pink-Red
+        };
+
+
+        // Debounce function to delay filter application - performance
+        function debounce(func, wait) {
+            let timeout;
+            return function(...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        }
+
+        const applyFiltersDebounced = debounce(applyFilters, 300); // 300ms delay
+
+        // Coordinates for Birmingham City Center
         var lat = 52.4862;
         var lon = -1.8904;
 
-        
         var southWest = L.latLng(52.3975, -1.987);  // Southwest corner of Birmingham
         var northEast = L.latLng(52.5575, -1.730);  // Northeast corner of Birmingham
         var bounds = L.latLngBounds(southWest, northEast);
 
-        
         var map = L.map('map', {
             center: [lat, lon],
-            zoom: 16,
-            maxBounds: bounds,  
-            maxBoundsViscosity: 1.0  
+            zoom: 13, // Default zoom level
+            maxBounds: bounds,
+            maxBoundsViscosity: 1.0,
+            zoomControl: false
         });
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        // Tile layers
+        var lightTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
+        });
+
+        var darkTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            className: 'dark-tiles' 
+        });
+
+        // Add the default light tile layer
+        lightTileLayer.addTo(map);
+
+        // Initialize marker cluster group
+        var markers = L.markerClusterGroup();
+
+        var allCrimes = [];
+
+        // Function to count crimes by type
+        function countCrimesByType(data) {
+            var crimeCounts = {};
+            data.forEach(function(crime) {
+                var crimeType = crime["Crime type"];
+                if (crimeCounts[crimeType]) {
+                    crimeCounts[crimeType]++;
+                } else {
+                    crimeCounts[crimeType] = 1;
+                }
+            });
+            return crimeCounts;
+        }
+
+        // Function to generate the dropdown and clickable list
+        function generateCrimeTypeFilters(crimeCounts) {
+            var crimeTypeDropdown = document.getElementById("crimeTypeDropdown");
+            var crimeTypeFilters = document.getElementById("crimeTypeFilters");
+
+            // Clear existing filters
+            crimeTypeDropdown.innerHTML = '<option value="All">All</option>';
+            crimeTypeFilters.innerHTML = "";
+
+            
+            var sortedCrimeTypes = Object.keys(crimeCounts).sort();
+
+           
+            sortedCrimeTypes.forEach(function(crimeType) {
+                
+                var option = document.createElement("option");
+                option.value = crimeType;
+                option.text = `${crimeType} (${crimeCounts[crimeType]})`;
+                crimeTypeDropdown.appendChild(option);
+
+                var filterItem = document.createElement("div");
+                filterItem.className = "crimeTypeFilterItem";
+                filterItem.innerHTML = `${crimeType} (${crimeCounts[crimeType]})`;
+                filterItem.addEventListener("click", function() {
+                    this.classList.toggle("selected");
+                    applyFiltersDebounced();
+                });
+                crimeTypeFilters.appendChild(filterItem);
+            });
+
+            generateLegend(sortedCrimeTypes);
+        }
+
+        // Function to generate the legend
+        function generateLegend(crimeTypes) {
+            var legendItems = document.getElementById("legendItems");
+            legendItems.innerHTML = ""; 
+
+            crimeTypes.forEach(function(crimeType) {
+                var color = crimeTypeColors[crimeType] || "#000000"; 
+
+                var legendItem = document.createElement("div");
+                legendItem.style.display = "flex";
+                legendItem.style.alignItems = "center";
+                legendItem.style.marginBottom = "5px";
+
+                var colorBox = document.createElement("div");
+                colorBox.style.width = "15px";
+                colorBox.style.height = "15px";
+                colorBox.style.backgroundColor = color;
+                colorBox.style.marginRight = "5px";
+
+                var crimeTypeText = document.createElement("span");
+                crimeTypeText.textContent = crimeType;
+
+                legendItem.appendChild(colorBox);
+                legendItem.appendChild(crimeTypeText);
+                legendItems.appendChild(legendItem);
+            });
+        }
+
+        // Function to apply filters
+        function applyFilters() {
+            
+            var selectedCrimeTypes = [];
+            document.querySelectorAll(".crimeTypeFilterItem.selected").forEach(function(item) {
+                var crimeType = item.textContent.split(" (")[0].trim(); // Trim extra spaces
+                selectedCrimeTypes.push(crimeType);
+            });
+            
+            var dropdownValue = document.getElementById("crimeTypeDropdown").value;
+
+            var selectedTime = document.getElementById("timeFilter").value;
+
+            // Filter the data
+            var filteredData = allCrimes.filter(function(crime) {
+                
+                var matchesQuickFilter = dropdownValue === "All" || crime["Crime type"].trim() === dropdownValue;
+
+                
+                var matchesMultiFilter = selectedCrimeTypes.length === 0 || !selectedCrimeTypes.includes(crime["Crime type"].trim());
+
+                // Simple time filter
+                var matchesTime = selectedTime === "" || crime["Month"].trim() === selectedTime;
+
+                return matchesQuickFilter && matchesMultiFilter && matchesTime;
+            });
+
+           
+            markers.clearLayers();
+
+            
+            addMarkersToMap(filteredData);
+        }
+
+        // Function to add markers to the map - cluster group
+        function addMarkersToMap(data) {
+            data.forEach(function(crime) {
+                var lat = crime["Latitude"];
+                var lon = crime["Longitude"];
+                var crimeType = crime["Crime type"];
+
+                // Get color based on crime type
+                var color = crimeTypeColors[crimeType];
+
+                var marker = L.circleMarker([lat, lon], {
+                    radius: 8,
+                    color: color,
+                    fillColor: color,
+                    fillOpacity: 0.8
+                }).bindPopup(`
+                    Crime Type: ${crimeType}<br>
+                    Date: ${crime["Month"]}<br>
+                    Outcome: ${crime["Last outcome category"]}<br>
+                    LSOA: ${crime["LSOA name"]}
+                `);
+
+                markers.addLayer(marker); 
+            });
+
+            map.addLayer(markers); 
+        }
+
+        $.getJSON("{% static 'crime_with_clusters_brum.json' %}?v=1.0", function(data) {
+            console.log("JSON data loaded successfully:", data);
+            allCrimes = data;
+
+           
+            document.getElementById("loadingSpinner").style.display = "none";
+            var crimeCounts = countCrimesByType(data);
+            generateCrimeTypeFilters(crimeCounts);
+
+            
+            addMarkersToMap(allCrimes);
+        }).fail(function(jqxhr, textStatus, error) {
+            console.error("Error loading JSON:", textStatus, error);
+            
+            document.getElementById("loadingSpinner").style.display = "none";
+        });
 
         
-        $.getJSON('{% static "crime_with_clusters_brum.json" %}', function(data) {
+        document.getElementById("applyFilters").addEventListener("click", applyFiltersDebounced);
 
-            // Loop through the crime data and add markers - to make them interactable later
-            data.forEach(function(crime) {
-                var lat = crime.Latitude;
-                var lon = crime.Longitude;
-                var cluster = crime.Cluster;
+        
+        document.getElementById("crimeTypeDropdown").addEventListener("change", applyFiltersDebounced);
 
-                
-                var color;
-                if (cluster === 0) {
-                    color = 'red'; 
-                } else if (cluster === 1) {
-                    color = 'blue'; 
-                } else {
-                    color = 'green'; 
-                }
+        
+        document.querySelectorAll(".crimeTypeFilterItem").forEach(function(item) {
+            item.addEventListener("click", applyFiltersDebounced);
+        });
 
-                
-                L.circleMarker([lat, lon], {
-                    radius: 8,           
-                    color: color,        
-                    fillColor: color,    
-                    fillOpacity: 0.8     
-                }).addTo(map);
-            });
+        // Dark Mode Toggle - currently an issue with flashing whenever a button is clicked - check later
+        var darkMode = false;
+        document.getElementById("darkModeToggle").addEventListener("click", function() {
+            darkMode = !darkMode; 
+            document.body.classList.toggle("dark-mode", darkMode); 
+
+            if (darkMode) {
+                lightTileLayer.remove();
+                darkTileLayer.addTo(map);
+                this.textContent = "☀️ Light Mode";
+            } else {
+                darkTileLayer.remove();
+                lightTileLayer.addTo(map);
+                this.textContent = "🌙 Dark Mode";
+            }
+        });
+
+        // Sidebar toggle
+        document.getElementById("sidebarToggle").addEventListener("click", function() {
+            //console.log("Sidebar toggle clicked"); // Debugging
+            document.getElementById("sidebar").classList.toggle("open");
         });
     </script>
 </body>

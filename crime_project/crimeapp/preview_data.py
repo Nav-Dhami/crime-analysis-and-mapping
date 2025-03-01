@@ -39,7 +39,9 @@ for month_folder in os.listdir(data_directory):
 
 # Combine all the loaded crime data into a single DataFrame
 if monthly_crime_data:
-    combined_crime_data_df = panda.concat(monthly_crime_data, ignore_index=True)
+    combined_crime_data_df = panda.concat(
+        monthly_crime_data, ignore_index=True
+    )
     print(f"Combined Crime DataFrame shape: {combined_crime_data_df.shape}")
 else:
     print("No crime data loaded.")

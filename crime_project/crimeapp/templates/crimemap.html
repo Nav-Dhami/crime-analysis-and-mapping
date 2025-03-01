@@ -25,23 +25,21 @@
     <!-- Dark Mode Toggle Button -->
     <button id="darkModeToggle">🌙 Dark Mode</button>
 
+    <!-- Prediction Mode Toggle Button -->
+    <button id="predictionModeToggle" style="position: fixed; top: 100px; right: 10px; z-index: 1003;">Prediction Mode</button>
+
     <!-- Side Navigation Bar -->
     <div id="sidebar">
         <button id="sidebarToggle">☰ Filters</button>
         <div id="sidebarContent">
             <h3>Filters</h3>
-          
             <div>
                 <label for="crimeTypeDropdown">Quick Filter:</label>
                 <select id="crimeTypeDropdown">
                     <option value="All">All</option>
-                 
                 </select>
             </div>
-           
-            <div id="crimeTypeFilters">
-               
-            </div>
+            <div id="crimeTypeFilters"></div>
             <div>
                 <label for="timeFilter">Time:</label>
                 <input type="month" id="timeFilter">
@@ -59,26 +57,24 @@
     <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
 
     <script>
-        
         const crimeTypeColors = {
-        "Anti-social behaviour": "#FF5733", // Strong Orange
-        "Bicycle theft": "#009688", // Teal
-        "Burglary": "#FFD700", // Yellow
-        "Criminal damage and arson": "#D50000", // Deep Red
-        "Drugs": "#8E24AA", // Dark Purple
-        "Other crime": "#00838F", // Deep Cyan
-        "Other theft": "#FF9800", // Bright Orange
-        "Possession of weapons": "#F44336", // Strong Red
-        "Public order": "#4CAF50", // Dark Green
-        "Robbery": "#1A237E", // Dark Blue
-        "Shoplifting": "#E65100", // Dark Orange
-        "Theft from the person": "#76FF03", // Neon Green
-        "Vehicle crime": "#FF69B4", // Pink
-        "Violence and sexual offences": "#C2185B" // Strong Pink-Red
+            "Anti-social behaviour": "#FF5733", // Strong Orange
+            "Bicycle theft": "#009688", // Teal
+            "Burglary": "#FFD700", // Yellow
+            "Criminal damage and arson": "#D50000", // Deep Red
+            "Drugs": "#8E24AA", // Dark Purple
+            "Other crime": "#00838F", // Deep Cyan
+            "Other theft": "#FF9800", // Bright Orange
+            "Possession of weapons": "#F44336", // Strong Red
+            "Public order": "#4CAF50", // Dark Green
+            "Robbery": "#1A237E", // Dark Blue
+            "Shoplifting": "#E65100", // Dark Orange
+            "Theft from the person": "#76FF03", // Neon Green
+            "Vehicle crime": "#FF69B4", // Pink
+            "Violence and sexual offences": "#C2185B" // Strong Pink-Red
         };
 
-
-        // Debounce function to delay filter application - performance
+        // Debounce function to delay filter application
         function debounce(func, wait) {
             let timeout;
             return function(...args) {
@@ -112,16 +108,18 @@
 
         var darkTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-            className: 'dark-tiles' 
+            className: 'dark-tiles'
         });
 
         // Add the default light tile layer
         lightTileLayer.addTo(map);
 
-        // Initialize marker cluster group
-        var markers = L.markerClusterGroup();
+        // Initialise marker cluster groups
+        var actualMarkers = L.markerClusterGroup();
+        var predictionMarkers = L.markerClusterGroup();
 
         var allCrimes = [];
+        var predictions = [];
 
         // Function to count crimes by type
         function countCrimesByType(data) {
@@ -146,12 +144,9 @@
             crimeTypeDropdown.innerHTML = '<option value="All">All</option>';
             crimeTypeFilters.innerHTML = "";
 
-            
             var sortedCrimeTypes = Object.keys(crimeCounts).sort();
 
-           
             sortedCrimeTypes.forEach(function(crimeType) {
-                
                 var option = document.createElement("option");
                 option.value = crimeType;
                 option.text = `${crimeType} (${crimeCounts[crimeType]})`;
@@ -173,10 +168,10 @@
         // Function to generate the legend
         function generateLegend(crimeTypes) {
             var legendItems = document.getElementById("legendItems");
-            legendItems.innerHTML = ""; 
+            legendItems.innerHTML = "";
 
             crimeTypes.forEach(function(crimeType) {
-                var color = crimeTypeColors[crimeType] || "#000000"; 
+                var color = crimeTypeColors[crimeType] || "#000000";
 
                 var legendItem = document.createElement("div");
                 legendItem.style.display = "flex";
@@ -200,46 +195,34 @@
 
         // Function to apply filters
         function applyFilters() {
-            
             var selectedCrimeTypes = [];
             document.querySelectorAll(".crimeTypeFilterItem.selected").forEach(function(item) {
-                var crimeType = item.textContent.split(" (")[0].trim(); // Trim extra spaces
+                var crimeType = item.textContent.split(" (")[0].trim();
                 selectedCrimeTypes.push(crimeType);
             });
-            
-            var dropdownValue = document.getElementById("crimeTypeDropdown").value;
 
+            var dropdownValue = document.getElementById("crimeTypeDropdown").value;
             var selectedTime = document.getElementById("timeFilter").value;
 
-            // Filter the data
             var filteredData = allCrimes.filter(function(crime) {
-                
                 var matchesQuickFilter = dropdownValue === "All" || crime["Crime type"].trim() === dropdownValue;
-
-                
                 var matchesMultiFilter = selectedCrimeTypes.length === 0 || !selectedCrimeTypes.includes(crime["Crime type"].trim());
-
-                // Simple time filter
                 var matchesTime = selectedTime === "" || crime["Month"].trim() === selectedTime;
 
                 return matchesQuickFilter && matchesMultiFilter && matchesTime;
             });
 
-           
-            markers.clearLayers();
-
-            
-            addMarkersToMap(filteredData);
+            actualMarkers.clearLayers();
+            addMarkersToMap(filteredData, actualMarkers);
         }
 
         // Function to add markers to the map - cluster group
-        function addMarkersToMap(data) {
+        function addMarkersToMap(data, markerGroup) {
             data.forEach(function(crime) {
                 var lat = crime["Latitude"];
                 var lon = crime["Longitude"];
                 var crimeType = crime["Crime type"];
 
-                // Get color based on crime type
                 var color = crimeTypeColors[crimeType];
 
                 var marker = L.circleMarker([lat, lon], {
@@ -254,45 +237,67 @@
                     LSOA: ${crime["LSOA name"]}
                 `);
 
-                markers.addLayer(marker); 
+                markerGroup.addLayer(marker);
             });
 
-            map.addLayer(markers); 
+            map.addLayer(markerGroup);
         }
 
+        // Load actual crime data
         $.getJSON("{% static 'crime_with_clusters_brum.json' %}?v=1.0", function(data) {
             console.log("JSON data loaded successfully:", data);
             allCrimes = data;
 
-           
             document.getElementById("loadingSpinner").style.display = "none";
             var crimeCounts = countCrimesByType(data);
             generateCrimeTypeFilters(crimeCounts);
 
-            
-            addMarkersToMap(allCrimes);
+            addMarkersToMap(allCrimes, actualMarkers);
         }).fail(function(jqxhr, textStatus, error) {
             console.error("Error loading JSON:", textStatus, error);
-            
             document.getElementById("loadingSpinner").style.display = "none";
         });
 
-        
+        // Load predicted crime data
+        $.getJSON("{% static 'predictions.json' %}", function(data) {
+            console.log("Predictions loaded successfully:", data);
+            predictions = data;
+
+            
+            addMarkersToMap(predictions, predictionMarkers);
+            map.removeLayer(predictionMarkers); // Hide predictions by default
+        }).fail(function(jqxhr, textStatus, error) {
+            console.error("Error loading predictions JSON:", textStatus, error);
+        });
+
+        // Toggle prediction mode
+        var predictionMode = false;
+        document.getElementById("predictionModeToggle").addEventListener("click", function() {
+            predictionMode = !predictionMode;
+
+            if (predictionMode) {
+                map.removeLayer(actualMarkers);
+                map.addLayer(predictionMarkers);
+                this.textContent = "Actual Crime Data";
+            } else {
+                map.removeLayer(predictionMarkers);
+                map.addLayer(actualMarkers);
+                this.textContent = "Prediction Mode";
+            }
+        });
+
+        // Event listeners
         document.getElementById("applyFilters").addEventListener("click", applyFiltersDebounced);
-
-        
         document.getElementById("crimeTypeDropdown").addEventListener("change", applyFiltersDebounced);
-
-        
         document.querySelectorAll(".crimeTypeFilterItem").forEach(function(item) {
             item.addEventListener("click", applyFiltersDebounced);
         });
 
-        // Dark Mode Toggle - currently an issue with flashing whenever a button is clicked - check later
+        // Dark Mode Toggle
         var darkMode = false;
         document.getElementById("darkModeToggle").addEventListener("click", function() {
-            darkMode = !darkMode; 
-            document.body.classList.toggle("dark-mode", darkMode); 
+            darkMode = !darkMode;
+            document.body.classList.toggle("dark-mode", darkMode);
 
             if (darkMode) {
                 lightTileLayer.remove();
@@ -307,7 +312,6 @@
 
         // Sidebar toggle
         document.getElementById("sidebarToggle").addEventListener("click", function() {
-            //console.log("Sidebar toggle clicked"); // Debugging
             document.getElementById("sidebar").classList.toggle("open");
         });
     </script>

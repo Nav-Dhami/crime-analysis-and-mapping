@@ -1,34 +1,40 @@
 {% load static %}
-
 <!DOCTYPE html>
 <html>
 <head>
     <title>Interactive Crime Map</title>
     <link rel="stylesheet" href="{% static 'css/leaflet.css' %}" />
     <link rel="stylesheet" href="{% static 'css/styles.css' %}" />
-    <!-- Leaflet Marker Clustering CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
 </head>
 <body>
-    <!-- Loading Spinner (hardly works due to load times not being long enough, although... keep for now as dataset will get bigger and db transition to MySQL)--> 
-    <div id="loadingSpinner" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1002;">
-        <div style="border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;"></div>
-    </div>
 
-    <!-- Legend -->
-    <div id="legend" style="position: fixed; top: 60px; right: 10px; background: rgba(255, 255, 255, 0.9); padding: 10px; border-radius: 5px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); z-index: 1002;">
+    <div id="noticeDisclaimer" class="disclaimer">
+        <div class="disclaimer-content">
+          <h2>Disclaimer</h2>
+          <p>
+            The predictions shown are derived from historical patterns and should not be interpreted as real-time threat assessments.
+            <br><br>
+            On the left side of the screen, you can find the side filter bar which features crime type filtering and time-based filtering to refine the data displayed.
+            <br><br>
+            In the top right corner of the screen, you can find the Dark Mode bar and the "Prediction" mode buttion that will display the predictive analytics based on hisotrical data. 
+          </p>
+          <button onclick="exitNotice()" class="exit-btn">I Understand</button>
+        </div>
+      </div>
+   
+
+    <div id="legend">
         <h4>Crime Types</h4>
         <div id="legendItems"></div>
     </div>
 
-    <!-- Dark Mode Toggle Button -->
     <button id="darkModeToggle">🌙 Dark Mode</button>
+    <button id="predictionModeToggle">Prediction Mode</button>
 
-    <!-- Prediction Mode Toggle Button -->
-    <button id="predictionModeToggle" style="position: fixed; top: 100px; right: 10px; z-index: 1003;">Prediction Mode</button>
-
-    <!-- Side Navigation Bar -->
     <div id="sidebar">
         <button id="sidebarToggle">☰ Filters</button>
         <div id="sidebarContent">
@@ -48,33 +54,39 @@
         </div>
     </div>
 
-    <!-- Map Container -->
+     
+    <div id="chartContainer">
+        <canvas id="crimeChart"></canvas>
+    </div>
+
     <div id="map"></div>
 
-    <!-- Leaflet, jQuery, and Marker Clustering -->
+     <!-- Leaflet, jQuery, and Marker Clustering -->
     <script src="{% static 'js/leaflet.js' %}"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
 
     <script>
+
+        //Note: Cannot use british "colour" as web standard expects american "color"
         const crimeTypeColors = {
-            "Anti-social behaviour": "#FF5733", // Strong Orange
-            "Bicycle theft": "#009688", // Teal
-            "Burglary": "#FFD700", // Yellow
-            "Criminal damage and arson": "#D50000", // Deep Red
-            "Drugs": "#8E24AA", // Dark Purple
-            "Other crime": "#00838F", // Deep Cyan
-            "Other theft": "#FF9800", // Bright Orange
-            "Possession of weapons": "#F44336", // Strong Red
-            "Public order": "#4CAF50", // Dark Green
-            "Robbery": "#1A237E", // Dark Blue
-            "Shoplifting": "#E65100", // Dark Orange
-            "Theft from the person": "#76FF03", // Neon Green
-            "Vehicle crime": "#FF69B4", // Pink
-            "Violence and sexual offences": "#C2185B" // Strong Pink-Red
+            "Anti-social behaviour": "#FF5733", //Orange
+            "Bicycle theft": "#009688", //Teal
+            "Burglary": "#FFD700", //Yellow
+            "Criminal damage and arson": "#D50000", //Dark Red
+            "Drugs": "#8E24AA", //Purple
+            "Other crime": "#6ee6eb", //Sky blue
+            "Other theft": "#FF9800", //Light orange
+            "Possession of weapons": "#d9ffab", //Pale green
+            "Public order": "#4CAF50", //Green
+            "Robbery": "#1A237E", //Dark blue
+            "Shoplifting": "#ffe9bf", //Cream
+            "Theft from the person": "#76FF03", //Light green
+            "Vehicle crime": "#FF69B4",//Pink
+            "Violence and sexual offences": "#C2185B" //Burgundy
         };
 
-        // Debounce function to delay filter application
+        //Debounce function to delay filter applying 300ms
         function debounce(func, wait) {
             let timeout;
             return function(...args) {
@@ -83,237 +95,268 @@
             };
         }
 
-        const applyFiltersDebounced = debounce(applyFilters, 300); // 300ms delay
+        
 
-        // Coordinates for Birmingham City Center
-        var lat = 52.4862;
-        var lon = -1.8904;
-
-        var southWest = L.latLng(52.3975, -1.987);  // Southwest corner of Birmingham
-        var northEast = L.latLng(52.5575, -1.730);  // Northeast corner of Birmingham
-        var bounds = L.latLngBounds(southWest, northEast);
-
-        var map = L.map('map', {
-            center: [lat, lon],
-            zoom: 13, // Default zoom level
-            maxBounds: bounds,
+        const applyFiltersDebounced = debounce(applyFilters, 300);
+        let map = L.map('map', {
+            center: [52.4862, -1.8904],
+            zoom: 13,
+            maxBounds: L.latLngBounds(L.latLng(52.3975, -1.987), L.latLng(52.5575, -1.730)),
             maxBoundsViscosity: 1.0,
             zoomControl: false
         });
 
-        // Tile layers
-        var lightTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        let zooming = false;
+        map.on('zoomstart', function() {
+            zooming = true;
         });
 
-        var darkTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-            className: 'dark-tiles'
+        map.on('zoomend', function() {
+            if (zooming) {
+                zooming = false;
+                
+            }
         });
 
-        // Add the default light tile layer
+        var lightTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+        var darkTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png');
+
         lightTileLayer.addTo(map);
 
-        // Initialise marker cluster groups
         var actualMarkers = L.markerClusterGroup();
         var predictionMarkers = L.markerClusterGroup();
-
         var allCrimes = [];
         var predictions = [];
+        let predictionMode = false;
+        let crimeStatChart;
 
-        // Function to count crimes by type
         function countCrimesByType(data) {
-            var crimeCounts = {};
-            data.forEach(function(crime) {
-                var crimeType = crime["Crime type"];
-                if (crimeCounts[crimeType]) {
-                    crimeCounts[crimeType]++;
-                } else {
-                    crimeCounts[crimeType] = 1;
-                }
+            const counts = {};
+            data.forEach(item => {
+                const type = item["Crime type"];
+                counts[type] = (counts[type] || 0) + 1;
             });
-            return crimeCounts;
+            return counts;
         }
 
-        // Function to generate the dropdown and clickable list
         function generateCrimeTypeFilters(crimeCounts) {
-            var crimeTypeDropdown = document.getElementById("crimeTypeDropdown");
-            var crimeTypeFilters = document.getElementById("crimeTypeFilters");
+            const dropdown = document.getElementById("crimeTypeDropdown");
+            const filters = document.getElementById("crimeTypeFilters");
+            dropdown.innerHTML = '<option value="All">All</option>';
+            filters.innerHTML = "";
 
-            // Clear existing filters
-            crimeTypeDropdown.innerHTML = '<option value="All">All</option>';
-            crimeTypeFilters.innerHTML = "";
+            const sorted = Object.keys(crimeCounts).sort();
 
-            var sortedCrimeTypes = Object.keys(crimeCounts).sort();
+            sorted.forEach(type => {
+                const count = crimeCounts[type];
+                const option = new Option(`${type} (${count})`, type);
+                dropdown.add(option);
 
-            sortedCrimeTypes.forEach(function(crimeType) {
-                var option = document.createElement("option");
-                option.value = crimeType;
-                option.text = `${crimeType} (${crimeCounts[crimeType]})`;
-                crimeTypeDropdown.appendChild(option);
-
-                var filterItem = document.createElement("div");
+                const filterItem = document.createElement("div");
                 filterItem.className = "crimeTypeFilterItem";
-                filterItem.innerHTML = `${crimeType} (${crimeCounts[crimeType]})`;
+                filterItem.textContent = `${type} (${count})`;
                 filterItem.addEventListener("click", function() {
                     this.classList.toggle("selected");
                     applyFiltersDebounced();
                 });
-                crimeTypeFilters.appendChild(filterItem);
+                filters.appendChild(filterItem);
             });
 
-            generateLegend(sortedCrimeTypes);
+            generateLegend(sorted);
         }
 
-        // Function to generate the legend
-        function generateLegend(crimeTypes) {
-            var legendItems = document.getElementById("legendItems");
-            legendItems.innerHTML = "";
+        function crimeChart(crimeStats) {
+            const contextVar = document.getElementById("crimeChart").getContext("2d");
+            const label = Object.keys(crimeStats);
+            const content = Object.values(crimeStats);
+            const colors = label.map(label => crimeTypeColors[label] || "#666");
 
-            crimeTypes.forEach(function(crimeType) {
-                var color = crimeTypeColors[crimeType] || "#000000";
+            if (crimeStatChart) crimeStatChart.destroy();
 
-                var legendItem = document.createElement("div");
-                legendItem.style.display = "flex";
-                legendItem.style.alignItems = "center";
-                legendItem.style.marginBottom = "5px";
-
-                var colorBox = document.createElement("div");
-                colorBox.style.width = "15px";
-                colorBox.style.height = "15px";
-                colorBox.style.backgroundColor = color;
-                colorBox.style.marginRight = "5px";
-
-                var crimeTypeText = document.createElement("span");
-                crimeTypeText.textContent = crimeType;
-
-                legendItem.appendChild(colorBox);
-                legendItem.appendChild(crimeTypeText);
-                legendItems.appendChild(legendItem);
+            crimeStatChart = new Chart(contextVar, {
+                type: 'bar', 
+                data: {
+                    labels: label,
+                    datasets: [{
+                        label: 'Crime Count by Type',
+                        data: content,
+                        backgroundColor: colors
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
             });
         }
 
-        // Function to apply filters
+        function generateLegend(types) {
+            const legend = document.getElementById("legendItems");
+            legend.innerHTML = "";
+            types.forEach(type => {
+                const color = crimeTypeColors[type] || "#000";
+                const item = document.createElement("div");
+                item.style.display = "flex";
+                item.style.alignItems = "center";
+                item.style.marginBottom = "5px";
+
+                const box = document.createElement("div");
+                box.style.width = "15px";
+                box.style.height = "15px";
+                box.style.backgroundColor = color;
+                box.style.marginRight = "5px";
+
+                const label = document.createElement("span");
+                label.textContent = type;
+
+                item.appendChild(box);
+                item.appendChild(label);
+                legend.appendChild(item);
+            });
+        }
+
+
+        function addMarkersToMap(info, cluster) {
+        info.forEach(crime => {
+            const color = crimeTypeColors[crime["Crime type"]] || "#000";
+            
+            let popupInfo = `
+                Crime Type: ${crime["Crime type"]}<br>
+                Date: ${crime["Month"]}<br>
+            `;
+
+            if (crime["Last outcome category"]) {
+                popupInfo += `Outcome: ${crime["Last outcome category"]}<br>`;
+            }
+
+            if (crime["LSOA name"]) {
+                popupInfo += `LSOA: ${crime["LSOA name"]}`;
+            }
+
+            const marker = L.circleMarker([crime["Latitude"], crime["Longitude"]], {
+                radius: 8, color, fillColor: color, fillOpacity: 0.8
+            }).bindPopup(popupInfo);
+
+            cluster.addLayer(marker);
+        });
+        map.addLayer(cluster);
+        }
+
+
+        //Filter functionality
         function applyFilters() {
-            var selectedCrimeTypes = [];
-            document.querySelectorAll(".crimeTypeFilterItem.selected").forEach(function(item) {
-                var crimeType = item.textContent.split(" (")[0].trim();
-                selectedCrimeTypes.push(crimeType);
-            });
-
-            var dropdownValue = document.getElementById("crimeTypeDropdown").value;
-            var selectedTime = document.getElementById("timeFilter").value;
-
-            var filteredData = allCrimes.filter(function(crime) {
-                var matchesQuickFilter = dropdownValue === "All" || crime["Crime type"].trim() === dropdownValue;
-                var matchesMultiFilter = selectedCrimeTypes.length === 0 || !selectedCrimeTypes.includes(crime["Crime type"].trim());
-                var matchesTime = selectedTime === "" || crime["Month"].trim() === selectedTime;
-
-                return matchesQuickFilter && matchesMultiFilter && matchesTime;
-            });
+            const selected = [...document.querySelectorAll(".crimeTypeFilterItem.selected")].map(i =>
+                i.textContent.split(" (")[0].trim());
+            const dropdown = document.getElementById("crimeTypeDropdown").value;
+            const selectedTime = document.getElementById("timeFilter").value;
+            const timeMatch = selectedTime ? selectedTime.substring(0, 7) : "";
 
             actualMarkers.clearLayers();
-            addMarkersToMap(filteredData, actualMarkers);
-        }
+            predictionMarkers.clearLayers();
 
-        // Function to add markers to the map - cluster group
-        function addMarkersToMap(data, markerGroup) {
-            data.forEach(function(crime) {
-                var lat = crime["Latitude"];
-                var lon = crime["Longitude"];
-                var crimeType = crime["Crime type"];
+            const source = predictionMode ? predictions : allCrimes;
+            const group = predictionMode ? predictionMarkers : actualMarkers;
 
-                var color = crimeTypeColors[crimeType];
-
-                var marker = L.circleMarker([lat, lon], {
-                    radius: 8,
-                    color: color,
-                    fillColor: color,
-                    fillOpacity: 0.8
-                }).bindPopup(`
-                    Crime Type: ${crimeType}<br>
-                    Date: ${crime["Month"]}<br>
-                    Outcome: ${crime["Last outcome category"]}<br>
-                    LSOA: ${crime["LSOA name"]}
-                `);
-
-                markerGroup.addLayer(marker);
+            const filtered = source.filter(crime => {
+                const type = crime["Crime type"].trim();
+                const month = crime["Month"].trim();
+                const matchType = dropdown === "All" || type === dropdown;
+                const matchMulti = selected.length === 0 || selected.includes(type);
+                const matchTime = selectedTime === "" || month === timeMatch;
+                return matchType && matchMulti && matchTime;
             });
 
-            map.addLayer(markerGroup);
+            addMarkersToMap(filtered, group);
         }
 
-        // Load actual crime data
-        $.getJSON("{% static 'crime_with_clusters_brum.json' %}?v=1.0", function(data) {
-            console.log("JSON data loaded successfully:", data);
-            allCrimes = data;
+        function clearFilters() {
+            document.querySelectorAll(".crimeTypeFilterItem.selected").forEach(item => item.classList.remove("selected"));
+            document.getElementById("crimeTypeDropdown").value = "All";
+            document.getElementById("timeFilter").value = "";
+        }
 
-            document.getElementById("loadingSpinner").style.display = "none";
-            var crimeCounts = countCrimesByType(data);
-            generateCrimeTypeFilters(crimeCounts);
+        //Event Listeners
+            document.getElementById("timeFilter").addEventListener("change", applyFiltersDebounced);
+            document.getElementById("applyFilters").addEventListener("click", applyFiltersDebounced);
+            document.getElementById("crimeTypeDropdown").addEventListener("change", applyFiltersDebounced);
 
-            addMarkersToMap(allCrimes, actualMarkers);
-        }).fail(function(jqxhr, textStatus, error) {
-            console.error("Error loading JSON:", textStatus, error);
-            document.getElementById("loadingSpinner").style.display = "none";
-        });
-
-        // Load predicted crime data
-        $.getJSON("{% static 'predictions.json' %}", function(data) {
-            console.log("Predictions loaded successfully:", data);
-            predictions = data;
-
-            
-            addMarkersToMap(predictions, predictionMarkers);
-            map.removeLayer(predictionMarkers); // Hide predictions by default
-        }).fail(function(jqxhr, textStatus, error) {
-            console.error("Error loading predictions JSON:", textStatus, error);
-        });
-
-        // Toggle prediction mode
-        var predictionMode = false;
-        document.getElementById("predictionModeToggle").addEventListener("click", function() {
-            predictionMode = !predictionMode;
-
-            if (predictionMode) {
-                map.removeLayer(actualMarkers);
-                map.addLayer(predictionMarkers);
-                this.textContent = "Actual Crime Data";
-            } else {
-                map.removeLayer(predictionMarkers);
-                map.addLayer(actualMarkers);
-                this.textContent = "Prediction Mode";
-            }
-        });
-
-        // Event listeners
-        document.getElementById("applyFilters").addEventListener("click", applyFiltersDebounced);
-        document.getElementById("crimeTypeDropdown").addEventListener("change", applyFiltersDebounced);
-        document.querySelectorAll(".crimeTypeFilterItem").forEach(function(item) {
-            item.addEventListener("click", applyFiltersDebounced);
-        });
-
-        // Dark Mode Toggle
-        var darkMode = false;
-        document.getElementById("darkModeToggle").addEventListener("click", function() {
-            darkMode = !darkMode;
-            document.body.classList.toggle("dark-mode", darkMode);
-
-            if (darkMode) {
-                lightTileLayer.remove();
-                darkTileLayer.addTo(map);
+            document.getElementById("darkModeToggle").addEventListener("click", function() {
+            const dark = document.body.classList.toggle("dark-mode");
+            if (dark) {
+                lightTileLayer.remove(); darkTileLayer.addTo(map);
                 this.textContent = "☀️ Light Mode";
             } else {
-                darkTileLayer.remove();
-                lightTileLayer.addTo(map);
+                darkTileLayer.remove(); lightTileLayer.addTo(map);
                 this.textContent = "🌙 Dark Mode";
             }
         });
 
-        // Sidebar toggle
         document.getElementById("sidebarToggle").addEventListener("click", function() {
             document.getElementById("sidebar").classList.toggle("open");
         });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            
+            const timeFilter = document.getElementById('timeFilter');
+
+            timeFilter.setAttribute('min', '2024-01');  
+            timeFilter.setAttribute('max', '2025-12');  
+
+            timeFilter.value = '2024-01';
+
+            });
+
+        //Button visualisation 
+
+        document.getElementById("predictionModeToggle").addEventListener("click", function() {
+            predictionMode = !predictionMode;
+            clearFilters();
+
+            if (predictionMode) {
+
+                map.removeLayer(actualMarkers);
+                map.addLayer(predictionMarkers);
+                this.textContent = "Actual Crime Data";
+
+                predictionMarkers.clearLayers();
+                addMarkersToMap(predictions, predictionMarkers);
+                generateCrimeTypeFilters(countCrimesByType(predictions));
+                crimeChart(countCrimesByType(predictions));
+                document.getElementById("chartContainer").style.display = "block";
+
+            } else {
+
+                map.removeLayer(predictionMarkers);
+                map.addLayer(actualMarkers);
+                this.textContent = "Prediction Mode";
+
+                actualMarkers.clearLayers();
+                addMarkersToMap(allCrimes, actualMarkers);
+                generateCrimeTypeFilters(countCrimesByType(allCrimes));
+                crimeChart(countCrimesByType(allCrimes));
+                document.getElementById("chartContainer").style.display = "none";
+            }
+        });
+
+        //Load the JSONs
+        $.getJSON("{% static 'crime_with_clusters_brum.json' %}?v=1.0", function(data) {
+            allCrimes = data;
+            generateCrimeTypeFilters(countCrimesByType(data));
+            crimeChart(countCrimesByType(data));
+            addMarkersToMap(allCrimes, actualMarkers);
+        });
+
+        $.getJSON("{% static 'predictions.json' %}?v=2", function(data) {
+            predictions = data;
+            addMarkersToMap(predictions, predictionMarkers);
+            map.removeLayer(predictionMarkers);
+        });
+
+        function exitNotice() {
+        document.getElementById('noticeDisclaimer').style.display = 'none';
+        }
+
     </script>
 </body>
 </html>

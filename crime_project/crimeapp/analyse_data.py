@@ -14,7 +14,7 @@ for month_folder in os.listdir(data_directory):
     if os.path.isdir(month_folder_path):
         print(f"Checking folder: {month_folder_path}")
 
-        # Define the paths for the required data files.
+        
         files = {
             "crime": f"{month_folder}-west-midlands-street.csv",
             "outcomes": f"{month_folder}-west-midlands-outcomes.csv",
@@ -27,7 +27,7 @@ for month_folder in os.listdir(data_directory):
             try:
                 if file_type == "crime":
                     crime_data_df = panda.read_csv(file_path)
-                    # Remove unnecessary columns.
+                    #Remove unnecessary columns.
                     crime_data_df = crime_data_df.drop(
                         columns=["Reported by", "Location"]
                     )
@@ -37,24 +37,24 @@ for month_folder in os.listdir(data_directory):
                 elif file_type == "outcomes":
                     panda.read_csv(
                         file_path
-                    )  # Outcomes data does not need cleaning.
+                    )  
                     print(f"Loaded outcomes data: {file_path}")
 
                 elif file_type == "stop_and_search":
                     panda.read_csv(
                         file_path
-                    )  # Stop and search data does not need cleaning.
+                    )  
                     print(f"Loaded stop and search data: {file_path}")
 
             except FileNotFoundError:
                 print(f"File not found: {file_path}")
 
-# Combine the cleaned crime data if any exists.
+
 if monthly_crime_data:
     combined_crime_data_df = panda.concat(monthly_crime_data, ignore_index=True)
     print(f"Combined Crime DataFrame shape: {combined_crime_data_df.shape}")
 
-    # Save the combined data for future analysis.
+    #Save the combined data for future analysis - can do other regions in future.
     combined_crime_data_df.to_csv("data/cleaned_crime_data.csv", index=False)
     print("Cleaned crime data saved as 'cleaned_crime_data.csv'")
 else:

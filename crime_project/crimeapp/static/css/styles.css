@@ -125,11 +125,55 @@ html, body {
 
 .crimeTypeFilterItem.selected {
     background: rgba(0, 123, 255, 0.2);
-    text-decoration: line-through;
-    color: #888;
+
 }
 
-/* Dark Mode Styles */
+/* Prediction mode button */
+
+#predictionModeToggle {
+    background-color: white;
+    color: black;
+    border: 1px solid black;
+    padding: 10px;   
+    position: fixed;
+    top: 10px;
+    right: 127px;        
+    cursor: pointer;
+    z-index: 1003;
+}
+
+#predictionModeToggle:hover {
+    color: rgb(38, 192, 190);
+}
+
+/* Legend */
+
+#legend {
+    position: fixed;
+    top: 60px;
+    right: 10px;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    z-index: 1002;
+}
+
+
+/* Dark Mode */
+
+#darkModeToggle {
+    background-color: white;
+    color: black;
+    border: 1px solid black;
+    padding: 10px;
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    cursor: pointer;
+    z-index: 1003;
+}
+
 body.dark-mode #sidebar {
     background: rgba(40, 40, 40, 0.95);
     border-left: 1px solid rgba(255, 255, 255, 0.1);
@@ -175,20 +219,9 @@ body.dark-mode #applyFilters:hover {
     background: #004080;
 }
 
-#darkModeToggle {
-    background-color: white;
-    color: black;
-    border: 1px solid black;
-    padding: 10px;
-    position: fixed;
-    top: 10px;
-    right: 10px;
-    cursor: pointer;
-    z-index: 1003;
-}
 
 .dark-mode #darkModeToggle {
-    background-color: black;
+    background-color: rgba(40, 40, 40, 0.9);
     color: white;
     border: 1px solid white;
 }
@@ -198,5 +231,70 @@ body.dark-mode #applyFilters:hover {
     background: #555;
 }
 
+.dark-mode #predictionModeToggle {
+    background-color: rgba(40, 40, 40, 0.9);
+    color: white;
+    border: 1px solid white;
+}
+
+body.dark-mode #legend {
+    background: rgba(40, 40, 40, 0.9);  
+    color: #ddd;  
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);  
+}
 
 
+/* Contextual Warning popup */
+
+.disclaimer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+  }
+  
+  .disclaimer-content {
+    background: #fff;
+    padding: 20px 30px;
+    border-radius: 12px;
+    max-width: 600px;
+    text-align: center;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+  }
+  
+  .disclaimer-content h2 {
+    margin-bottom: 15px;
+  }
+  
+  .disclaimer-content p {
+    font-size: 15px;
+    line-height: 1.5;
+    color: #111010;
+  }
+  
+  .exit-btn {
+    margin-top: 20px;
+    padding: 8px 20px;
+    background-color: #010913;
+    color: white;
+    font-size: 16px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  
+  #chartContainer {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 600px;
+            background: rgba(255,255,255,0.95);
+            border-radius: 10px;
+            z-index: 1001;
+        }
